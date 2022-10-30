@@ -1,0 +1,499 @@
+/**
+ * * * *
+ * seq *
+ * * * *
+ * voiq => questionnaire AFTER  google
+ * vqoi => questionnaire BEFORE google
+ * * * *
+ */
+
+window.wellybox = function(){};
+
+function wellybox_email_provider_callback(email, provider) {
+  
+}
+
+function getQueryStringParam(parameterName, queryString) {
+	if(typeof queryString === "undefined" || queryString == null) {
+		queryString = location.search;
+	}
+	
+	var result = null, tmp = [];
+	var items = queryString.substr(1).split("&");
+	for (var index = 0; index < items.length; index++) {
+		tmp = items[index].split("=");
+		if (tmp[0] === parameterName) result = decodeURIComponent(tmp[1]);
+	}
+	return result;
+}
+
+window.wellybox.contactUsRequested = function(prepopulatedMsg) {
+    if(typeof window.CRISP_WEBSITE_ID === "string") {
+        $crisp.push(["do", "chat:open"]);
+        if (typeof prepopulatedMsg === "string") {
+            $crisp.push(["set", "message:text", [prepopulatedMsg]]);
+        }
+    } else if(typeof Intercom === "function") {
+        if (typeof prepopulatedMsg === "string") {
+            Intercom('showNewMessage', prepopulatedMsg);
+        } else {
+            Intercom('showNewMessage');
+        }
+    } else {
+        document.location.href = "mailto:support@wellybox.com";
+    }
+};
+
+window.wellybox.fixWordPressLinks = function() {
+	if(jQuery) {
+		jQuery("a:contains('צור קשר'), a:contains('צרו קשר'), a:contains('Contact'), .elementor-heading-title:contains('צור קשר'), .elementor-heading-title:contains('צרו קשר'), .elementor-heading-title:contains('Contact')").on("click", function(event) {
+			event.stopPropagation();
+			window.wellybox.contactUsRequested();
+			return false;
+		});
+	}
+};
+
+window.wellybox.setCookie = function(name,value,days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+	var domain = location.hostname.split('.').reverse()[1] + "." + location.hostname.split('.').reverse()[0];
+    document.cookie = name + "=" + (value || "")  + expires + "; domain=." + domain + "; path=/";
+};
+
+window.wellybox.getCookie = function(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for(var i=0;i < ca.length;i++) {
+        var c = ca[i];
+        while (c.charAt(0)==' ') c = c.substring(1,c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+    }
+    return null;
+};
+
+window.wellybox.eraseCookie = function(name) {   
+    document.cookie = name+'=; Max-Age=-99999999;';  
+};
+
+window.wellybox.initReferer = function() {
+	existingVal = window.wellybox.getCookie("referer");
+	if(typeof existingVal !== "string" || existingVal === "") {
+		if(typeof document.referrer === "string") {
+			window.wellybox.setCookie("referer", document.referrer, 3);
+		}
+	}
+};
+
+window.wellybox.initTrack = function() {
+	existingVal = window.wellybox.getCookie("landing");
+	if(typeof existingVal !== "string" || existingVal === "") {
+		if(typeof location.search === "string") {
+			window.wellybox.setCookie("landing", location.search, 3);
+		}
+	}
+};
+
+window.wellybox.initCoupon = function() {
+	var newCouponVal = getQueryStringParam("coupon")
+	existingVal = window.wellybox.getCookie("coupon");
+	if(typeof newCouponVal === "string" && newCouponVal != "") {
+		window.wellybox.setCookie("coupon", newCouponVal, 3);
+	}
+};
+
+window.wellybox.initNext = function() {
+	var newNextVal = getQueryStringParam("next")
+	existingVal = window.wellybox.getCookie("next");
+	if(typeof newNextVal === "string" && newNextVal != "") {
+		window.wellybox.setCookie("next", newNextVal, 3);
+	}
+};
+
+window.wellybox.initSeq = function() {
+	var newSeqVal = getQueryStringParam("seq")
+	existingVal = window.wellybox.getCookie("seq");
+	if(typeof newSeqVal === "string" && newSeqVal != "") {
+		window.wellybox.setCookie("seq", newSeqVal, 3);
+	}
+};
+
+window.wellybox.getUrlPrefix = function() {
+	var urlPrefix = null;
+	if(getQueryStringParam("v") === "local") {
+	  urlPrefix = "http://lapp.wellybox.net";
+	}
+	if(getQueryStringParam("v") === "staging") {
+	  urlPrefix = "https://app.wellybox.net";
+	}
+	if(getQueryStringParam("v") === "prod") {
+	  urlPrefix = "https://app.wellybox.com";
+	}
+	if(urlPrefix !== null) {
+		return urlPrefix;
+	}
+
+	var landingQueryString = window.wellybox.getTrackValue();
+	if(typeof landingQueryString !== "string") {
+	  landingQueryString = "";
+	}
+	
+	urlPrefix = "https://app.wellybox.com";
+	if(getQueryStringParam("v", landingQueryString) === "local") {
+	  urlPrefix = "http://lapp.wellybox.net";
+	}
+	if(getQueryStringParam("v", landingQueryString) === "staging") {
+	  urlPrefix = "http://app.wellybox.net";
+	}
+	if(getQueryStringParam("v", landingQueryString) === "prod") {
+	  urlPrefix = "https://app.wellybox.com";
+	}
+	return urlPrefix;
+};
+
+window.wellybox.checkLoggedInToWellyBox = function() {
+	var urlPrefix = window.wellybox.getUrlPrefix();
+	var scriptUrl = urlPrefix + "/is-logged-in";
+	var s = document.createElement('script');
+	s.setAttribute('src', scriptUrl);
+	s.async = true;
+	document.body.appendChild(s);
+};
+
+window.isLoggedInToWellyBox = function(isLoggedIn) { /* app server callback */
+	if(isLoggedIn) {
+		if(document.location.href.toLowerCase().indexOf("/login") >= 0) {
+			var url = window.wellybox.getUrlPrefix();
+			document.location.href = url;
+		}
+	}
+};
+
+window.wellybox.getRefererValue = function() {
+	existingVal = window.wellybox.getCookie("referer");
+	if(typeof existingVal === "string") {
+		return existingVal;
+	}
+	if(typeof document.referrer === "string") {
+		return document.referrer;
+	}
+	return null;
+};
+
+window.wellybox.getTrackValue = function() {
+	existingVal = window.wellybox.getCookie("landing");
+	if(typeof existingVal === "string") {
+		return existingVal;
+	}
+	if(typeof location.search === "string") {
+		return location.search;
+	}
+	return null;
+};
+
+window.wellybox.getCouponValue = function() {
+	existingVal = window.wellybox.getCookie("coupon");
+	if(typeof existingVal === "string") {
+		return existingVal;
+	}
+	var newCouponVal = getQueryStringParam("coupon")
+	return newCouponVal;
+};
+
+window.wellybox.getNextValue = function() {
+	existingVal = window.wellybox.getCookie("next");
+	if(typeof existingVal === "string") {
+		return existingVal;
+	}
+	var newNextVal = getQueryStringParam("next")
+	return newNextVal;
+};
+
+window.wellybox.getSeqValue = function() {
+	existingVal = window.wellybox.getCookie("seq");
+	if(typeof existingVal === "string") {
+		return existingVal;
+	}
+	var newSeqVal = getQueryStringParam("seq")
+	return newSeqVal;
+};
+
+window.wellybox.intent = "reg";
+window.wellybox.fixLinks = function() {
+	window.wellybox.intent = "reg";
+	if(document.location.href.toLowerCase().indexOf("/login") >= 0) {
+		window.wellybox.intent = "login";
+	}
+
+	var anchors = document.getElementsByTagName("a");
+	for(i in anchors) {
+		var anchor = anchors[i];
+		if(anchor.href) {
+			if(anchor.href.toLowerCase().indexOf("regjsfail") >= 0 && anchor.href.toLowerCase().indexOf("google") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('google',null,'reg');void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("regjsfail") >= 0 && anchor.href.toLowerCase().indexOf("microsoft") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('microsoft',null,'reg');void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("loginjsfail") >= 0 && anchor.href.toLowerCase().indexOf("google") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('google',null,'login');void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("loginjsfail") >= 0 && anchor.href.toLowerCase().indexOf("microsoft") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('microsoft',null,'login');void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("dualjsfail") >= 0 && anchor.href.toLowerCase().indexOf("google") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('google',null,'dual');void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("dualjsfail") >= 0 && anchor.href.toLowerCase().indexOf("microsoft") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('microsoft',null,'dual');void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("pwjsfail") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('pw',null,'dual');void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("regjsfail") >= 0) {
+				var urlPrefix = wellybox.getUrlPrefix();
+				anchor.href = urlPrefix + "/?utm_source=website_login";
+			} else if(anchor.href.toLowerCase().indexOf("?dest=google") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('google',null,window.wellybox.intent);void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("?dest=microsoft") >= 0) {
+				anchor.href = "javascript:wellybox.onboard('microsoft',null,window.wellybox.intent);void(0);";
+			} else if(anchor.href.toLowerCase().indexOf("?dest=login") >= 0) {
+				var urlPrefix = wellybox.getUrlPrefix();
+				anchor.href = urlPrefix + "/?utm_source=website_login";
+			} else if(anchor.href.toLowerCase().indexOf("action=contact") >= 0) {
+				anchor.href = "javascript:window.wellybox.contactUsRequested();";
+				anchor.onclick = function() {
+					window.wellybox.contactUsRequested();
+					return false;
+				};
+			}
+		}
+	}
+	
+	/* https://www.wellybox.com/?placeholder=receipt_download_url */
+	if(document.location.href.toLowerCase().indexOf("get-receipt") >= 0) {
+		var receiptCtaLinkVal = getQueryStringParam("receipt_download_url");
+		if(receiptCtaLinkVal !== null && typeof(receiptCtaLinkVal) === "string") {
+			if(receiptCtaLinkVal.toLowerCase().indexOf("https://app.wellybox.com/") !== 0 && receiptCtaLinkVal.toLowerCase().indexOf("https://lapp.wellybox.net/") !== 0 &&
+				receiptCtaLinkVal.toLowerCase().indexOf("http://app.wellybox.com/") !== 0 && receiptCtaLinkVal.toLowerCase().indexOf("http://lapp.wellybox.net/") !== 0) {
+				alert("Bad receipt_download_url: " + receiptCtaLinkVal);
+				return;
+			}
+			var receiptPlaceholderUrlPart = "placeholder=receipt_download_url";
+			jQuery('a[href*="' + receiptPlaceholderUrlPart + '"]').attr("href", receiptCtaLinkVal);
+		}
+	}
+};
+
+/* javascript:window.wellybox.onboard("microsoft"/"google"); */ 
+window.wellybox.onboard = function(vendor, rawSection, intent) {
+	var account = "";
+	var aff = "organic";
+	var channel = "homepage";
+	var section = "generic"
+	var variant = null;
+	
+	var intent_str = ""
+	if(typeof intent === "string") {
+		intent_str = intent;
+	}
+	if(document.location.href.toLowerCase().indexOf("/login") >= 0) {
+		intent_str = "login";
+	}
+	  
+	if(typeof rawSection === "string") {
+		section = rawSection;
+	}
+
+	var landingQueryString = window.wellybox.getTrackValue();
+	if(typeof landingQueryString !== "string") {
+	  landingQueryString = "";
+	}
+	  
+	var utm_source = getQueryStringParam("utm_source", landingQueryString);
+	if(typeof utm_source === "string" && utm_source !== null) {
+		aff = utm_source;
+	}
+
+	var wb_source = getQueryStringParam("wb_source", landingQueryString);
+	if(typeof wb_source === "string" && wb_source !== null) {
+		aff = wb_source;
+	}
+	
+	var utm_campaign = getQueryStringParam("utm_campaign", landingQueryString);
+	if(typeof utm_campaign === "string" && utm_campaign !== null) {
+		channel = utm_campaign;
+	}
+	
+	var wb_campaign = getQueryStringParam("wb_campaign", landingQueryString);
+	if(typeof wb_campaign === "string" && wb_campaign !== null) {
+		channel = wb_campaign;
+	}
+	
+	var utm_content = getQueryStringParam("utm_content", landingQueryString);
+	var utm_term = getQueryStringParam("utm_term", landingQueryString);
+	if(typeof utm_content === "string" && utm_content !== null) {
+		variant = utm_content;
+	} else if(typeof utm_term === "string" && utm_term !== null) {
+		variant = utm_term;
+	}
+	
+	var wb_content = getQueryStringParam("wb_content", landingQueryString);
+	var wb_term = getQueryStringParam("wb_term", landingQueryString);
+	if(typeof wb_content === "string" && wb_content !== null) {
+		variant = wb_content;
+	} else if(typeof wb_term === "string" && wb_term !== null) {
+		variant = wb_term;
+	}
+	
+	var affinfo = aff + "!" + channel + "!hp_" + section;
+	if(typeof variant === "string" ) {
+		affinfo = affinfo + "!" + variant;
+	}
+	  
+	  if(typeof window.culture_code === "undefined" || window.culture_code == null) {
+		  window.culture_code = "en_US";
+	  }
+	  
+	  var referer = window.wellybox.getRefererValue();
+	  if(typeof referer !== "string") {
+		  referer = "";
+	  }
+
+	  var couponVal = window.wellybox.getCouponValue();
+	  if(typeof couponVal !== "string") {
+		  couponVal = "";
+	  }
+
+	  var nextVal = window.wellybox.getNextValue();
+	  if(typeof nextVal !== "string") {
+		  nextVal = "";
+	  }
+	  
+	  var seqVal = window.wellybox.getSeqValue();
+	  if(typeof seqVal !== "string") {
+		  seqVal = "";
+	  }
+	  
+	  var urlPrefix = wellybox.getUrlPrefix();
+
+	  var dryRun = false;
+	  if(getQueryStringParam("v", landingQueryString) === "alert") {
+		  dryRun = true;
+	  }
+	  
+	  var returnUrl = getQueryStringParam("return_url", landingQueryString)
+	  
+	  var culture = "en_US";
+	  if(document.location.host.toLowerCase().indexOf("he.") === 0) {
+	  	  culture = "he_IL";
+	  }
+
+      var url = null;
+	  
+	  if(vendor === "pw") {
+		url = urlPrefix + "/sign-in?pw=1";
+	  } else { //was: register-anonymous-prospect
+		url = urlPrefix + "/onboarding?account=" + encodeURIComponent(account) + "&vendor=" + encodeURIComponent(vendor) + "&affinfo=" + encodeURIComponent(affinfo) + "&referer=" + encodeURIComponent(referer) + "&coupon=" + encodeURIComponent(couponVal) + "&seq=" + encodeURIComponent(seqVal) + "&culture=" + encodeURIComponent(culture) + "&intent=" + encodeURIComponent(intent_str) + "&next=" + encodeURIComponent(nextVal);
+	  }
+	  
+	  if(typeof returnUrl === "string") {
+		  returnUrl = "&return_url=" + encodeURIComponent(returnUrl);
+		  url = url + returnUrl;
+	  }
+	  
+	  if(dryRun === true) {
+		alert(url);
+	  } else {
+		document.location.href = url;
+	  }
+};
+
+function wellybox_update_geo_ip(country_code, ip_address) {
+	window.country_code = country_code;
+	if(typeof country_code === "string" && country_code != null) {
+		country_code = country_code.toUpperCase();
+		if(country_code === "IL" || document.location.href.toLowerCase().indexOf("//he.") >= 0) {
+			culture_code = "he_IL";
+		} else {
+			culture_code = "en_US";
+		}
+		window.culture_code = culture_code;
+	}
+	
+	timezone = "";
+	try {
+		timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	} catch(e) {
+		timezone = "";
+	}
+
+	timezoneOffset = "";
+	try {
+		timezoneOffset = Date.getTimezoneOffset()
+	} catch(e) {
+		timezoneOffset = "";
+	}
+	
+	var urlPrefix = wellybox.getUrlPrefix();
+	var scriptTag = document.createElement("script");
+	var firstScriptTag = document.getElementsByTagName("script")[0];
+	scriptTag.src = urlPrefix + '/update_geo_direct?country_code=' + encodeURIComponent(country_code) + "&ip_address=" + encodeURIComponent(ip_address) + "&time_zone=" + encodeURIComponent(timezone) + "&time_zone_offset=" + encodeURIComponent(timezoneOffset);
+	firstScriptTag.parentNode.insertBefore(scriptTag, firstScriptTag);
+}
+
+window.onloadHandlerRanAlready = false;
+
+setInterval(window.wellybox.fixLinks, 100);
+
+window.wellybox.onloadHandler = function() {
+	if(window.onloadHandlerRanAlready === true) {
+		return;
+	}
+	
+	window.wellybox.fixWordPressLinks();
+	
+	window.onloadHandlerRanAlready = true;
+	
+	window.culture_code = null;
+	
+	var scriptTag2 = document.createElement('script'),
+	firstScriptTag2 = document.getElementsByTagName('script')[0];
+	scriptTag2.src = 'https://helpers.wellybox.com/helpers/geo/';
+	firstScriptTag2.parentNode.insertBefore(scriptTag2, firstScriptTag2);
+	
+	window.wellybox.initReferer();
+	window.wellybox.initTrack();
+	window.wellybox.initCoupon();
+	window.wellybox.initNext();
+	window.wellybox.initSeq();
+
+	if(document.location.href.toLowerCase().indexOf("action=try") >= 0) {
+		document.location.href = "/signup/";
+	}
+	
+	window.wellybox.fixLinks();
+	
+	window.wellybox.checkLoggedInToWellyBox();
+	
+	if(document.location.href.indexOf("action=contact") >= 0 || document.location.href.indexOf("action=support") >= 0) {
+		window.wellybox.contactUsRequested();
+	}
+};
+
+document.addEventListener("DOMContentLoaded", function(event) {
+	wellybox.onloadHandler();
+});
+
+//Fallback for IE8 etc.
+wellybox.previousOnload = window.onload;
+window.onload = function() {
+	wellybox.previousOnload();
+	wellybox.onloadHandler();
+}
+
+try {
+	let navData = window.performance.getEntriesByType("navigation");
+	if (navData.length > 0 && navData[0].loadEventEnd > 0){
+		wellybox.onloadHandler();
+	}
+} catch(e2) {
+	
+}
